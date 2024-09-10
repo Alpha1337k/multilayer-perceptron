@@ -1,8 +1,10 @@
 from matplotlib import pyplot as plt
+from matplotlib.ticker import PercentFormatter
 import pandas as pd
 import argparse
 from pydantic import ConfigDict, validate_call
 import matplotlib.colors as mcolors
+import numpy as np
 
 model_config = ConfigDict(arbitrary_types_allowed=True)
 
@@ -18,9 +20,10 @@ def describe(df: pd.DataFrame):
 def plot_dataset(path: str, b: pd.Series, m: pd.Series):
 	plt.plot()
 
-	plt.hist(b, color='red', bins=50)
-	plt.hist(m, color='blue', bins=50)
+	plt.hist(b, color='red', bins=50, weights=np.ones(len(b)) / len(b))
+	plt.hist(m, color='blue', bins=50, weights=np.ones(len(m)) / len(m))
 
+	plt.gca().yaxis.set_major_formatter(PercentFormatter(1))
 
 	plt.title(path)
 	plt.savefig(path)
