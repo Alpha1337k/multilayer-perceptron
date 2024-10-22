@@ -23,6 +23,7 @@ if __name__ == "__main__":
 	subparser.add_parser('describe')
 	subparser.add_parser('plot')
 	subparser.add_parser('train')
+	subparser.add_parser('train_test')
 
 	args = parser.parse_args()
 
@@ -39,3 +40,5 @@ if __name__ == "__main__":
 			plot.plot(df)
 		case "train":
 			train.run(df)
+		case "train_test":
+			train.run_sklearn(df)
