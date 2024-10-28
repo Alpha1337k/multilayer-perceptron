@@ -1,4 +1,5 @@
 import math
+from typing import List
 import numpy as np
 import pandas as pd
 from pydantic import ConfigDict, validate_call
@@ -36,6 +37,9 @@ def run_sklearn(df: pd.DataFrame):
 
 	print(ypred, accuracy_score(Y_Test, ypred))
 
+def transfer_derivative(output) -> float:
+	return output * (1.0 - output)
+
 def activate(weights, bias, X):
 	activation = bias
 
@@ -46,7 +50,7 @@ def activate(weights, bias, X):
 
 @validate_call(config=model_config)
 def train(network: Network, dataset: Dataset):
-	weights = []
+	weights: List[List[List[float]]] = []
 	biases = [-0.5] * len(network.layers)
 
 	prev_layer_size = 1
@@ -55,7 +59,7 @@ def train(network: Network, dataset: Dataset):
 		layer_weights = []
 
 		for i in range(layer.size):
-			layer_weights.append(np.array([1] * prev_layer_size))
+			layer_weights.append(np.array([1 + i * 0.1] * prev_layer_size))
 		prev_layer_size = layer.size
 
 		weights.append(layer_weights)
@@ -63,22 +67,60 @@ def train(network: Network, dataset: Dataset):
 	# print(weights, biases)
 
 	iterations = 1
+	l_rate = 0.2
 
 	for i in range(iterations):
-		for item in dataset.X:
+		for item_x, item_y in zip(dataset.X, dataset.Y):
+			store = InputStore(inputs=item_x, network=network)
 
-			store = InputStore(inputs=item, network=network)
-
-			for l, layer in enumerate(network.layers):
+			for layer_idx, layer in enumerate(network.layers):
 				for node_idx in range(layer.size):
-					activation = activate(weights[l][node_idx], biases[l], store.get_inputs(l, node_idx))
+					activation = activate(weights[layer_idx][node_idx], biases[layer_idx], store.get_inputs(layer_idx, node_idx))
 
 					output = 1 / (1 + math.e ** (-activation))
 
-					print(l, node_idx, store.get_inputs(l, node_idx), activation, output)
+					print(layer_idx, node_idx, store.get_inputs(layer_idx, node_idx), activation, output)
 
-					store.set_inputs(l, node_idx, output)
-			break
+					store.set_inputs(layer_idx, node_idx, output)
+
+			error_store = InputStore(inputs=[], network=network)
+			delta_store = InputStore(inputs=[], network=network)
+
+			for layer_idx in reversed(range(len(network.layers))):
+				layer = network.layers[layer_idx]
+				outputs = store.get_layer(layer_idx)
+
+				if (layer_idx == len(network.layers) - 1):
+					for neuron_idx in range(layer.size):
+						error_store.set_inputs(layer_idx, neuron_idx, outputs[neuron_idx] - item_y)
+				else:
+					for neuron_idx in range(layer.size):
+						error = 0.0
+
+						for neuron_weights in weights[layer_idx + 1]:
+							error += neuron_weights[neuron_idx] * delta_store.get_output(layer_idx, neuron_idx)
+
+						error_store.set_inputs(layer_idx, neuron_idx, error)
+
+				for neuron_idx in range(layer.size):
+					error = error_store.get_output(layer_idx, neuron_idx)
+					output = store.get_output(layer_idx, neuron_idx)
+
+					delta_store.set_inputs(layer_idx, neuron_idx, error * transfer_derivative(output))
+
+			for i, layer in enumerate(network.layers):
+				print(i)
+
+				for n_idx, neuron in enumerate(weights[i]):
+					inputs = store.get_inputs(i, n_idx)
+					for weight_idx in range(len(neuron)):
+						neuron[weight_idx] -= l_rate * delta_store.get_output(i, n_idx) * inputs[weight_idx]
+					biases[layer_idx] -= l_rate * delta_store.get_output(i, n_idx)
+
+	for i, layer in enumerate(weights):
+		for node in weights:
+			print(i, node)
+
 
 
 @validate_call(config=model_config)

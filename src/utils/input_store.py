@@ -19,12 +19,18 @@ class InputStore(BaseModel):
 		self.is_init = True
 		self.cached_inputs = [[0] * layer.size for layer in self.network.layers]
 
+	def get_output(self, layer: int, node: int):
+		return self.cached_inputs[layer][node]
+
 	@validate_call
 	def get_inputs(self, layer: int, node: int):
 		if (layer == 0):
 			return [self.inputs[node]]
 		if (self.is_init == False):
 			self.init()
+		return self.cached_inputs[layer - 1]
+	
+	def get_layer(self, layer: int) -> List[float]:
 		return self.cached_inputs[layer - 1]
 		
 
