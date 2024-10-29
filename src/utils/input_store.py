@@ -21,6 +21,9 @@ class InputStore(BaseModel):
 
 	def get_output(self, layer: int, node: int):
 		return self.cached_inputs[layer][node]
+	
+	def get_outputs(self, layer: int):
+		return self.cached_inputs[layer]
 
 	@validate_call
 	def get_inputs(self, layer: int, node: int):

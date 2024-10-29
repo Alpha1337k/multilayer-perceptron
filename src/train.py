@@ -1,5 +1,5 @@
 import math
-from typing import List
+from typing import Callable, List, TypeVar
 import numpy as np
 import pandas as pd
 from pydantic import ConfigDict, validate_call
@@ -9,9 +9,31 @@ from utils.dataset import Dataset
 from utils.input_store import InputStore
 from utils.layer import Layer
 from utils.network import Network
+from random import seed
+from random import random
 
 model_config = ConfigDict(arbitrary_types_allowed=True)
 
+T = TypeVar('T')
+
+@validate_call
+def make_rand_array(size: int):
+	arr = []
+
+	for i in range(size):
+		arr.append((random() - 0.5) * 2)
+
+	return arr
+
+@validate_call
+def make_structure(network: Network, init: Callable[[int, int], T]) -> List[List[T]]:
+	structure = []
+	
+	for l_idx, layer in enumerate(network.layers):
+		items = [init(l_idx, i) for i in range(layer.size)]
+		structure.append(items)
+
+	return structure
 
 @validate_call(config=model_config)
 def run_sklearn(df: pd.DataFrame):
@@ -26,7 +48,7 @@ def run_sklearn(df: pd.DataFrame):
 	X_Test = X[-50:]
 	Y_Test = Y[-50:]
 
-	clf = MLPClassifier(hidden_layer_sizes=(30, 30),
+	clf = MLPClassifier(hidden_layer_sizes=(8, 8),
 						random_state=5,
 						verbose=True,
 						learning_rate_init=0.01)
@@ -40,7 +62,8 @@ def run_sklearn(df: pd.DataFrame):
 def transfer_derivative(output) -> float:
 	return output * (1.0 - output)
 
-def activate(weights, bias, X):
+@validate_call
+def activate(weights: List[float], bias: float, X: List[float]) -> float:
 	activation = bias
 
 	for weight, x in zip(weights, X):
@@ -48,84 +71,118 @@ def activate(weights, bias, X):
 	
 	return activation
 
+@validate_call
+def forward_propagate(network: Network, weights: List[List[List[float]]], biases: List[float], X: List[float]):
+	inputs = make_structure(network, lambda l, i: 0.0)
+
+	for layer_idx, layer in enumerate(network.layers):
+		for node_idx in range(layer.size):
+			if (layer_idx == 0):
+				input = [X[node_idx]]
+			else:
+				input = inputs[layer_idx - 1]
+
+			activation = activate(weights[layer_idx][node_idx], biases[layer_idx], input)
+
+			if (layer.activation == 'sigmoid'):
+				output = 1 / (1 + math.e ** (-activation))
+			else:
+				output = 1 / (1 + math.e ** (-activation))
+
+			# print(layer_idx, node_idx, store.get_inputs(layer_idx, node_idx), activation, output)
+
+			inputs[layer_idx][node_idx] = output
+
+	return inputs
+
+@validate_call
+def backward_propagate(network: Network, weights: List[List[List[float]]], outputs: List[List[float]], expected: List[int]):
+	deltas = make_structure(network, lambda l, i: 0.0)
+	errors = make_structure(network, lambda l, i: 0.0)
+
+	for layer_idx in reversed(range(len(network.layers))):
+		layer = network.layers[layer_idx]
+		layer_output = outputs[layer_idx] 
+
+		if (layer_idx == len(network.layers) - 1):
+			for neuron_idx in range(layer.size):
+				errors[layer_idx][neuron_idx] = layer_output[neuron_idx] - expected[neuron_idx]
+		else:
+			for neuron_idx in range(layer.size):
+				error = 0.0
+
+				for forward_node_idx, forward_weight in enumerate(weights[layer_idx + 1]):
+					error += forward_weight[neuron_idx] * deltas[layer_idx + 1][forward_node_idx]
+
+				errors[layer_idx][neuron_idx] = error
+
+		for neuron_idx in range(layer.size):
+			error = errors[layer_idx][neuron_idx]
+			output = outputs[layer_idx][neuron_idx]
+
+			deltas[layer_idx][neuron_idx] = error * transfer_derivative(output)
+	
+	return deltas, errors
+
+@validate_call
+def update_weights(
+	network: Network, 
+	old_weights: List[List[List[float]]], 
+	old_biases: List[float], 
+	deltas: List[List[float]], 
+	outputs: List[List[float]],
+	X: List[float]
+):
+	l_rate = 1
+	weights = make_structure(network, lambda l, i: make_rand_array(network.layers[l - 1].size) if l > 0 else [random()])
+	biases = [0.0] * len(network.layers)
+
+
+	for layer_idx, layer in enumerate(network.layers):
+		for n_idx, neuron in enumerate(weights[layer_idx]):
+			inputs: List[float] = []
+
+			if (layer_idx == 0):
+				inputs = [X[n_idx]]
+			else:
+				inputs = outputs[layer_idx - 1]
+
+			for input_idx in range(len(inputs)):
+				weights[layer_idx][n_idx][input_idx] = old_weights[layer_idx][n_idx][input_idx] - l_rate * deltas[layer_idx][n_idx] * inputs[input_idx]
+
+			biases[layer_idx] = old_biases[layer_idx] - l_rate * deltas[layer_idx][n_idx]	
+
+	return weights, biases
+
+
 @validate_call(config=model_config)
 def train(network: Network, dataset: Dataset):
-	weights: List[List[List[float]]] = []
-	biases = [-0.5] * len(network.layers)
-
-	prev_layer_size = 1
-
-	for layer in network.layers:
-		layer_weights = []
-
-		for i in range(layer.size):
-			layer_weights.append(np.array([1 + i * 0.1] * prev_layer_size))
-		prev_layer_size = layer.size
-
-		weights.append(layer_weights)
-
-	# print(weights, biases)
+	weights = make_structure(network, lambda l, i: make_rand_array(network.layers[l - 1].size) if l > 0 else [random()])
+	biases = [-1.4] * len(network.layers)
 
 	iterations = 1
-	l_rate = 0.2
 
 	for i in range(iterations):
+		sum_error = 0.0
+
 		for item_x, item_y in zip(dataset.X, dataset.Y):
-			store = InputStore(inputs=item_x, network=network)
+			outputs = forward_propagate(network, weights, biases, item_x)
+			expected = [1 if item_y == 0 else 0, 1 if item_y == 1 else 0]
 
-			for layer_idx, layer in enumerate(network.layers):
-				for node_idx in range(layer.size):
-					activation = activate(weights[layer_idx][node_idx], biases[layer_idx], store.get_inputs(layer_idx, node_idx))
+			sum_error += sum((exp - output[0]) ** 2 for exp, output in zip(expected, outputs[:-1]))
 
-					output = 1 / (1 + math.e ** (-activation))
+			deltas, errors = backward_propagate(network, weights, outputs, expected)
 
-					print(layer_idx, node_idx, store.get_inputs(layer_idx, node_idx), activation, output)
-
-					store.set_inputs(layer_idx, node_idx, output)
-
-			error_store = InputStore(inputs=[], network=network)
-			delta_store = InputStore(inputs=[], network=network)
-
-			for layer_idx in reversed(range(len(network.layers))):
-				layer = network.layers[layer_idx]
-				outputs = store.get_layer(layer_idx)
-
-				if (layer_idx == len(network.layers) - 1):
-					for neuron_idx in range(layer.size):
-						error_store.set_inputs(layer_idx, neuron_idx, outputs[neuron_idx] - item_y)
-				else:
-					for neuron_idx in range(layer.size):
-						error = 0.0
-
-						for neuron_weights in weights[layer_idx + 1]:
-							error += neuron_weights[neuron_idx] * delta_store.get_output(layer_idx, neuron_idx)
-
-						error_store.set_inputs(layer_idx, neuron_idx, error)
-
-				for neuron_idx in range(layer.size):
-					error = error_store.get_output(layer_idx, neuron_idx)
-					output = store.get_output(layer_idx, neuron_idx)
-
-					delta_store.set_inputs(layer_idx, neuron_idx, error * transfer_derivative(output))
-
-			for i, layer in enumerate(network.layers):
-				print(i)
-
-				for n_idx, neuron in enumerate(weights[i]):
-					inputs = store.get_inputs(i, n_idx)
-					for weight_idx in range(len(neuron)):
-						neuron[weight_idx] -= l_rate * delta_store.get_output(i, n_idx) * inputs[weight_idx]
-					biases[layer_idx] -= l_rate * delta_store.get_output(i, n_idx)
-
-	for i, layer in enumerate(weights):
-		for node in weights:
-			print(i, node)
+			weights, biases = update_weights(network, weights, biases, deltas, outputs, item_x)
+		
+		print(f"Epoch {i}, sum_error: {sum_error}")
 
 
 
 @validate_call(config=model_config)
 def run(df: pd.DataFrame):
-	dataset = Dataset.make(df, 20)
+	dataset = Dataset.make(df, 80)
+	seed(0)
 
 	# print(len(dataset.X), len(dataset.Y))
 	# print(len(dataset.XValidate), len(dataset.YValidate))
@@ -134,8 +191,8 @@ def run(df: pd.DataFrame):
 		# in
 		Layer(size=30, activation='sigmoid'),
 		# hidden
-		Layer(size=30, activation='sigmoid'),
-		Layer(size=30, activation='sigmoid'),
+		Layer(size=8, activation='sigmoid'),
+		Layer(size=8, activation='sigmoid'),
 		# out
 		Layer(size=2, activation='softmax'),
 	])
@@ -143,3 +200,5 @@ def run(df: pd.DataFrame):
 	print(network)
 
 	train(network, dataset)
+
+	# run_sklearn(df)
