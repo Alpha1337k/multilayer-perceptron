@@ -1,4 +1,5 @@
 import math
+from os import error
 from typing import Callable, List, TypeVar
 import numpy as np
 import pandas as pd
@@ -21,6 +22,7 @@ def make_rand_array(size: int):
 	arr = []
 
 	for i in range(size):
+		# arr.append(1)
 		arr.append((random() - 0.5) * 2)
 
 	return arr
@@ -127,16 +129,13 @@ def backward_propagate(network: Network, weights: List[List[List[float]]], outpu
 @validate_call
 def update_weights(
 	network: Network, 
-	old_weights: List[List[List[float]]], 
-	old_biases: List[float], 
+	weights: List[List[List[float]]], 
+	biases: List[float], 
 	deltas: List[List[float]], 
 	outputs: List[List[float]],
 	X: List[float]
 ):
-	l_rate = 1
-	weights = make_structure(network, lambda l, i: make_rand_array(network.layers[l - 1].size) if l > 0 else [random()])
-	biases = [0.0] * len(network.layers)
-
+	l_rate = 0.75
 
 	for layer_idx, layer in enumerate(network.layers):
 		for n_idx, neuron in enumerate(weights[layer_idx]):
@@ -148,9 +147,9 @@ def update_weights(
 				inputs = outputs[layer_idx - 1]
 
 			for input_idx in range(len(inputs)):
-				weights[layer_idx][n_idx][input_idx] = old_weights[layer_idx][n_idx][input_idx] - l_rate * deltas[layer_idx][n_idx] * inputs[input_idx]
+				weights[layer_idx][n_idx][input_idx] -= l_rate * deltas[layer_idx][n_idx] * inputs[input_idx]
 
-			biases[layer_idx] = old_biases[layer_idx] - l_rate * deltas[layer_idx][n_idx]	
+			# biases[layer_idx] -= l_rate * deltas[layer_idx][n_idx]
 
 	return weights, biases
 
@@ -158,31 +157,59 @@ def update_weights(
 @validate_call(config=model_config)
 def train(network: Network, dataset: Dataset):
 	weights = make_structure(network, lambda l, i: make_rand_array(network.layers[l - 1].size) if l > 0 else [random()])
-	biases = [-1.4] * len(network.layers)
+	biases = [0.] * len(network.layers)
 
-	iterations = 1
+	iterations = 10000
 
 	for i in range(iterations):
 		sum_error = 0.0
 
 		for item_x, item_y in zip(dataset.X, dataset.Y):
 			outputs = forward_propagate(network, weights, biases, item_x)
+
+			# for (output, weight) in zip(outputs, weights):
+			# 	print(output, "\n||\n", weight, "\n")
+
+			# exit(1)
+
 			expected = [1 if item_y == 0 else 0, 1 if item_y == 1 else 0]
 
-			sum_error += sum((exp - output[0]) ** 2 for exp, output in zip(expected, outputs[:-1]))
+			sum_error += sum((exp - output) ** 2 for exp, output in zip(expected, outputs[-1]))
 
 			deltas, errors = backward_propagate(network, weights, outputs, expected)
 
-			weights, biases = update_weights(network, weights, biases, deltas, outputs, item_x)
-		
-		print(f"Epoch {i}, sum_error: {sum_error}")
+			# print(item_y, outputs[-1], deltas[-1], errors[-1])
 
+			weights, biases = update_weights(network, weights, biases, deltas, outputs, item_x)
+
+		print(f"Epoch {i}, sum_error: {sum_error}, bias: {biases}")
+
+	return weights, biases
+
+
+@validate_call
+def validate(network: Network, weights: List[List[List[float]]], biases: List[float], dataset: Dataset):
+	y_pred = []
+	for item_x, item_y in zip(dataset.XValidate, dataset.YValidate):
+		output = forward_propagate(network, weights, biases, item_x)
+
+		res = output[-1]
+
+		if (res[0] > res[1]):
+			y_pred.append(0)
+		else:
+			y_pred.append(1)
+
+	print(f"--- RESULTS ---")
+	print(f"{100 * accuracy_score(dataset.YValidate, y_pred):.2f}% correct.")
+	print(f"{accuracy_score(dataset.YValidate, y_pred, normalize=False):.2f} out of {len(dataset.YValidate)} correct.")
+	print(f"--- RESULTS ---")
+	
 
 
 @validate_call(config=model_config)
 def run(df: pd.DataFrame):
 	dataset = Dataset.make(df, 80)
-	seed(0)
 
 	# print(len(dataset.X), len(dataset.Y))
 	# print(len(dataset.XValidate), len(dataset.YValidate))
@@ -199,6 +226,8 @@ def run(df: pd.DataFrame):
 
 	print(network)
 
-	train(network, dataset)
+	weights, biases = train(network, dataset)
+
+	validate(network, weights, biases, dataset)
 
 	# run_sklearn(df)

@@ -30,7 +30,9 @@ class Dataset(BaseModel):
 
 	@staticmethod
 	def make(df: pd.DataFrame, validation_pct: int | None):
-		df.iloc[:,2:] = df.iloc[:,2:].apply(lambda x: (x-x.min())/(x.max()-x.min()), axis=0)
+		# df.iloc[:,2:] = df.iloc[:,2:].apply(lambda x: (x-x.min())/(x.max()-x.min()), axis=0)
+		df.iloc[:,2:] = df.iloc[:,2:].apply(lambda x: (x-x.mean())/x.std(), axis=0)
+
 
 		X = df.iloc[:, 2:].to_numpy()
 		Y = np.array([classifier_to_int[i] for i in df.iloc[:, 1].to_numpy()])
