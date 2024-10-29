@@ -78,6 +78,7 @@ def forward_propagate(network: Network, weights: List[List[List[float]]], biases
 	inputs = make_structure(network, lambda l, i: 0.0)
 
 	for layer_idx, layer in enumerate(network.layers):
+		sm_activation = []
 		for node_idx in range(layer.size):
 			if (layer_idx == 0):
 				input = [X[node_idx]]
@@ -88,12 +89,18 @@ def forward_propagate(network: Network, weights: List[List[List[float]]], biases
 
 			if (layer.activation == 'sigmoid'):
 				output = 1 / (1 + math.e ** (-activation))
-			else:
-				output = 1 / (1 + math.e ** (-activation))
+				inputs[layer_idx][node_idx] = output
+			elif layer.activation == 'softmax':
+				sm_activation.append(math.e ** activation)
+			else: raise Exception("InvalidActivator")
 
 			# print(layer_idx, node_idx, store.get_inputs(layer_idx, node_idx), activation, output)
 
-			inputs[layer_idx][node_idx] = output
+		if (layer.activation == 'softmax'):
+			total_activation = sum(sm_activation)
+
+			inputs[layer_idx] = [activation / (1 + total_activation) for activation in sm_activation]
+
 
 	return inputs
 
@@ -159,7 +166,7 @@ def train(network: Network, dataset: Dataset):
 	weights = make_structure(network, lambda l, i: make_rand_array(network.layers[l - 1].size) if l > 0 else [random()])
 	biases = [0.] * len(network.layers)
 
-	iterations = 10000
+	iterations = 200
 
 	for i in range(iterations):
 		sum_error = 0.0
@@ -204,12 +211,28 @@ def validate(network: Network, weights: List[List[List[float]]], biases: List[fl
 	print(f"{100 * accuracy_score(dataset.YValidate, y_pred):.2f}% correct.")
 	print(f"{accuracy_score(dataset.YValidate, y_pred, normalize=False):.2f} out of {len(dataset.YValidate)} correct.")
 	print(f"--- RESULTS ---")
+
+	y_pred = []
+	for item_x, item_y in zip(dataset.X, dataset.Y):
+		output = forward_propagate(network, weights, biases, item_x)
+
+		res = output[-1]
+
+		if (res[0] > res[1]):
+			y_pred.append(0)
+		else:
+			y_pred.append(1)
+
+	print(f"--- RESULTS ---")
+	print(f"{100 * accuracy_score(dataset.Y, y_pred):.2f}% correct.")
+	print(f"{accuracy_score(dataset.Y, y_pred, normalize=False):.2f} out of {len(dataset.Y)} correct.")
+	print(f"--- RESULTS ---")
 	
 
 
 @validate_call(config=model_config)
 def run(df: pd.DataFrame):
-	dataset = Dataset.make(df, 80)
+	dataset = Dataset.make(df, 20)
 
 	# print(len(dataset.X), len(dataset.Y))
 	# print(len(dataset.XValidate), len(dataset.YValidate))
@@ -218,8 +241,8 @@ def run(df: pd.DataFrame):
 		# in
 		Layer(size=30, activation='sigmoid'),
 		# hidden
-		Layer(size=8, activation='sigmoid'),
-		Layer(size=8, activation='sigmoid'),
+		Layer(size=20, activation='sigmoid'),
+		Layer(size=20, activation='sigmoid'),
 		# out
 		Layer(size=2, activation='softmax'),
 	])
