@@ -243,6 +243,6 @@ def run(input, output, iterations: int, learning_rate: float):
 
 	validate(network, weights, biases, dataset)
 
-	save_weights(output, weights, biases, mean, std)
+	save_weights(output, weights, biases, mean, std, network)
 
 	# run_sklearn(df)
