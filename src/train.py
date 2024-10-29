@@ -12,6 +12,8 @@ from utils.network import Network
 from random import seed
 from random import random
 
+from utils.weights import save_weights
+
 model_config = ConfigDict(arbitrary_types_allowed=True)
 
 T = TypeVar('T')
@@ -115,10 +117,9 @@ def update_weights(
 	biases: List[float], 
 	deltas: List[List[float]], 
 	outputs: List[List[float]],
-	X: List[float]
+	X: List[float],
+	learning_rate: float
 ):
-	l_rate = 0.75
-
 	for layer_idx, layer in enumerate(network.layers):
 		for n_idx, neuron in enumerate(weights[layer_idx]):
 			inputs: List[float] = []
@@ -129,19 +130,18 @@ def update_weights(
 				inputs = outputs[layer_idx - 1]
 
 			for input_idx in range(len(inputs)):
-				weights[layer_idx][n_idx][input_idx] -= l_rate * deltas[layer_idx][n_idx] * inputs[input_idx]
+				weights[layer_idx][n_idx][input_idx] -= learning_rate * deltas[layer_idx][n_idx] * inputs[input_idx]
 
-			biases[layer_idx] -= l_rate * deltas[layer_idx][n_idx]
+			biases[layer_idx] -= learning_rate * deltas[layer_idx][n_idx]
 
 	return weights, biases
 
 
 @validate_call(config=model_config)
-def train(network: Network, dataset: Dataset):
+def train(network: Network, dataset: Dataset, iterations: int, learning_rate: float):
 	weights = make_structure(network, lambda l, i: make_rand_array(network.layers[l - 1].size) if l > 0 else [random()])
 	biases = [0.] * len(network.layers)
 
-	iterations = 200
 
 	for i in range(iterations):
 		sum_error = 0.0
@@ -167,7 +167,7 @@ def train(network: Network, dataset: Dataset):
 
 			# print(item_y, outputs[-1], deltas[-1], errors[-1])
 
-			weights, biases = update_weights(network, weights, biases, deltas, outputs, item_x)
+			weights, biases = update_weights(network, weights, biases, deltas, outputs, item_x, learning_rate)
 
 		print(f"Epoch {i}, sum_error: {sum_error / len(dataset.X)}, bias: {biases}")
 
@@ -211,7 +211,17 @@ def validate(network: Network, weights: List[List[List[float]]], biases: List[fl
 
 
 @validate_call(config=model_config)
-def run(df: pd.DataFrame):
+def run(input, output, iterations: int, learning_rate: float):
+	df = pd.read_csv(input, names=["id", "diagnosis"] + [f"c_{i}" for i in range(0, 30)] )
+
+	labels = df['diagnosis'].copy()
+
+	df.drop(labels=[ 'diagnosis' ], axis=1)
+
+	mean, std = df.iloc[:,2:].mean().to_numpy(), df.iloc[:,2:].std().to_numpy()
+
+	print(mean, std)
+
 	dataset = Dataset.make(df, 20)
 
 	# print(len(dataset.X), len(dataset.Y))
@@ -229,8 +239,10 @@ def run(df: pd.DataFrame):
 
 	print(network)
 
-	weights, biases = train(network, dataset)
+	weights, biases = train(network, dataset, iterations, learning_rate)
 
 	validate(network, weights, biases, dataset)
+
+	save_weights(output, weights, biases, mean, std)
 
 	# run_sklearn(df)

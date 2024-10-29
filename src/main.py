@@ -22,7 +22,14 @@ if __name__ == "__main__":
 
 	subparser.add_parser('describe')
 	subparser.add_parser('plot')
-	subparser.add_parser('train')
+	train_parser = subparser.add_parser('train')
+	
+	train_parser.add_argument('--input', type=argparse.FileType('r'), default='./data/train.csv')
+	train_parser.add_argument('-i', '--iterations', default='200', type=int)
+	train_parser.add_argument('--learning-rate', default='0.5', type=float)
+	train_parser.add_argument('-o', '--output', type=argparse.FileType('w'), default='output/weights.json')
+
+
 	split = subparser.add_parser('split')
 
 	split.add_argument('-i', '--input', type=argparse.FileType('r'), default='data/raw.csv')
@@ -48,7 +55,7 @@ if __name__ == "__main__":
 		case "split":
 			split_dataset(args.input, args.validation_pct, args.train_path, args.validate_path)
 		case "train":
-			train.run(df)
+			train.run(args.input, args.output, args.iterations, args.learning_rate)
 		case "train_test":
 			sklearn_example.run(df)
 		case _:

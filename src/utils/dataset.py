@@ -31,6 +31,7 @@ class Dataset(BaseModel):
 	@staticmethod
 	def make(df: pd.DataFrame, validation_pct: int | None):
 		# df.iloc[:,2:] = df.iloc[:,2:].apply(lambda x: (x-x.min())/(x.max()-x.min()), axis=0)
+
 		df.iloc[:,2:] = df.iloc[:,2:].apply(lambda x: (x-x.mean())/x.std(), axis=0)
 
 
