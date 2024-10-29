@@ -7,7 +7,6 @@ from pydantic import ConfigDict, validate_call
 from sklearn.metrics import accuracy_score
 from sklearn.neural_network import MLPClassifier
 from utils.dataset import Dataset
-from utils.input_store import InputStore
 from utils.layer import Layer
 from utils.network import Network
 from random import seed
@@ -36,30 +35,6 @@ def make_structure(network: Network, init: Callable[[int, int], T]) -> List[List
 		structure.append(items)
 
 	return structure
-
-@validate_call(config=model_config)
-def run_sklearn(df: pd.DataFrame):
-	df.iloc[:,2:] = df.iloc[:,2:].apply(lambda x: (x-x.min())/(x.max()-x.min()), axis=0)
-
-	X = df.iloc[:, 2:]
-	Y = df.iloc[:, 1]
-
-	X_Train = X[:-50]
-	Y_Train = Y[:-50]
-
-	X_Test = X[-50:]
-	Y_Test = Y[-50:]
-
-	clf = MLPClassifier(hidden_layer_sizes=(8, 8),
-						random_state=5,
-						verbose=True,
-						learning_rate_init=0.01)
-	
-	clf.fit(X_Train, Y_Train)
-
-	ypred = clf.predict(X_Test)
-
-	print(ypred, accuracy_score(Y_Test, ypred))
 
 def transfer_derivative(output) -> float:
 	return output * (1.0 - output)
@@ -156,7 +131,7 @@ def update_weights(
 			for input_idx in range(len(inputs)):
 				weights[layer_idx][n_idx][input_idx] -= l_rate * deltas[layer_idx][n_idx] * inputs[input_idx]
 
-			# biases[layer_idx] -= l_rate * deltas[layer_idx][n_idx]
+			biases[layer_idx] -= l_rate * deltas[layer_idx][n_idx]
 
 	return weights, biases
 
@@ -181,7 +156,12 @@ def train(network: Network, dataset: Dataset):
 
 			expected = [1 if item_y == 0 else 0, 1 if item_y == 1 else 0]
 
-			sum_error += sum((exp - output) ** 2 for exp, output in zip(expected, outputs[-1]))
+			# sum_error += sum((exp - output) ** 2 for exp, output in zip(expected, outputs[-1]))
+
+			for x, (exp, output) in enumerate(zip(expected, outputs[-1])):
+				# if (x == item_y and expected[x] > expected[1 - x] ):
+					sum_error += -exp * math.log(output + 1e-15) - (1 - exp) * math.log(1 - output + 1e-15)
+
 
 			deltas, errors = backward_propagate(network, weights, outputs, expected)
 
@@ -189,7 +169,7 @@ def train(network: Network, dataset: Dataset):
 
 			weights, biases = update_weights(network, weights, biases, deltas, outputs, item_x)
 
-		print(f"Epoch {i}, sum_error: {sum_error}, bias: {biases}")
+		print(f"Epoch {i}, sum_error: {sum_error / len(dataset.X)}, bias: {biases}")
 
 	return weights, biases
 
