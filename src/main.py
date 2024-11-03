@@ -13,6 +13,15 @@ import sklearn_example
 from split_dataset import split_dataset
 import train
 
+def load_df(input):
+	df = pd.read_csv(args.input)
+
+	labels = df['diagnosis'].copy()
+
+	df.drop(labels=[ 'diagnosis' ], axis=1)
+
+	return df
+
 if __name__ == "__main__":
 	parser = argparse.ArgumentParser(
 		prog="multilayer-perceptron",
@@ -21,8 +30,13 @@ if __name__ == "__main__":
 
 	subparser = parser.add_subparsers(dest="task")
 
-	subparser.add_parser('describe')
-	subparser.add_parser('plot')
+	describe_parser = subparser.add_parser('describe')
+	describe_parser.add_argument('--input', type=argparse.FileType('r'), default='./data/train.csv')
+
+
+	plot_parser = subparser.add_parser('plot')
+	plot_parser.add_argument('--input', type=argparse.FileType('r'), default='./data/train.csv')
+
 	train_parser = subparser.add_parser('train')
 	
 	train_parser.add_argument('--input', type=argparse.FileType('r'), default='./data/train.csv')
@@ -39,7 +53,8 @@ if __name__ == "__main__":
 	split.add_argument('--train-path', type=str, default="./data/train.csv")
 	split.add_argument('--validate-path', type=str, default="./data/validate.csv")
 
-	subparser.add_parser('train_test')
+	test_parser = subparser.add_parser('train_test')
+	test_parser.add_argument('--input', type=argparse.FileType('r'), default='./data/train.csv')
 
 	predict_parser = subparser.add_parser('predict')
 	predict_parser.add_argument('-c', '--config', type=argparse.FileType('r'), default='./config.py')
@@ -51,17 +66,11 @@ if __name__ == "__main__":
 
 	args = parser.parse_args()
 
-	# df = pd.read_csv(args.input, names=["id", "diagnosis"] + [f"c_{i}" for i in range(0, 30)] )
-
-	# labels = df['diagnosis'].copy()
-
-	# df.drop(labels=[ 'diagnosis' ], axis=1)
-
 	match args.task:
 		case "describe":
-			describe.describe(df)
+			describe.describe(load_df(args.input))
 		case "plot":
-			plot.plot(df)
+			plot.plot(load_df(args.input))
 		case "split":
 			split_dataset(args.input, args.validation_pct, args.train_path, args.validate_path)
 		case "train":
@@ -69,7 +78,7 @@ if __name__ == "__main__":
 		case "predict":
 			predict.predict(args.weights, args.input, args.config)
 		case "train_test":
-			sklearn_example.run(df)
+			sklearn_example.run(load_df(args.input))
 		case _:
 			parser.print_help()
 			exit(1)

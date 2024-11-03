@@ -43,8 +43,6 @@ def plot_dataset(path: str, b: pd.Series, m: pd.Series):
 def plot(df: pd.DataFrame):
 	df.iloc[:,2:] = df.iloc[:,2:].apply(lambda x: (x-x.min())/(x.max()-x.min()), axis=0)
 
-
-
 	data_M = df[df['diagnosis'] == 'M']
 	data_B = df[df['diagnosis'] == 'B']
 

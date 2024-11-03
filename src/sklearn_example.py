@@ -20,7 +20,7 @@ def run(df: pd.DataFrame):
 	X_Test = X[-50:]
 	Y_Test = Y[-50:]
 
-	clf = MLPClassifier(hidden_layer_sizes=(8, 8),
+	clf = MLPClassifier(hidden_layer_sizes=(20, 20),
 						random_state=5,
 						verbose=True,
 						learning_rate_init=0.01)
