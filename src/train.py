@@ -6,6 +6,7 @@ import pandas as pd
 from pydantic import ConfigDict, validate_call
 from sklearn.metrics import accuracy_score
 from sklearn.neural_network import MLPClassifier
+from plot import plot_accuracy, plot_log_loss
 from utils.dataset import Dataset
 from utils.layer import Layer
 from utils.network import Network
@@ -136,15 +137,41 @@ def update_weights(
 
 	return weights, biases
 
+@validate_call(config=model_config)
+def	get_validation_scores(network: Network, dataset: Dataset, weights: List[List[List[float]]], biases: List[float]):
+	log_loss_score = 0
+	accuracy_score = 0
+
+	for item_x, item_y in zip(dataset.XValidate, dataset.YValidate):
+		outputs = forward_propagate(network, weights, biases, item_x)
+
+
+		expected = [1 if item_y == 0 else 0, 1 if item_y == 1 else 0]
+
+		if (outputs[-1][0] > outputs[-1][1] and item_y == 0) or (outputs[-1][1] > outputs[-1][0] and item_y == 1):
+			accuracy_score += 1
+
+		for x, (exp, output) in enumerate(zip(expected, outputs[-1])):
+			log_loss_score += -exp * math.log(output + 1e-15) - (1 - exp) * math.log(1 - output + 1e-15)
+
+	return (log_loss_score / len(dataset.XValidate)), accuracy_score / len(dataset.XValidate)
+
+
 
 @validate_call(config=model_config)
 def train(network: Network, dataset: Dataset, iterations: int, learning_rate: float):
 	weights = make_structure(network, lambda l, i: make_rand_array(network.layers[l - 1].size) if l > 0 else [random()])
 	biases = [0.] * len(network.layers)
 
+	log_loss_store_train = []
+	accuracy_store_train = []
+	log_loss_store_validate = []
+	accuracy_store_validate = []
+
 
 	for i in range(iterations):
 		sum_error = 0.0
+		total_correct = 0
 
 		for item_x, item_y in zip(dataset.X, dataset.Y):
 			outputs = forward_propagate(network, weights, biases, item_x)
@@ -155,6 +182,9 @@ def train(network: Network, dataset: Dataset, iterations: int, learning_rate: fl
 			# exit(1)
 
 			expected = [1 if item_y == 0 else 0, 1 if item_y == 1 else 0]
+
+			if (outputs[-1][0] > outputs[-1][1] and item_y == 0) or (outputs[-1][1] > outputs[-1][0] and item_y == 1):
+				total_correct += 1
 
 			# sum_error += sum((exp - output) ** 2 for exp, output in zip(expected, outputs[-1]))
 
@@ -169,9 +199,18 @@ def train(network: Network, dataset: Dataset, iterations: int, learning_rate: fl
 
 			weights, biases = update_weights(network, weights, biases, deltas, outputs, item_x, learning_rate)
 
-		print(f"Epoch {i}, sum_error: {sum_error / len(dataset.X)}, bias: {biases}")
+		validation_log_loss, validation_accuracy = get_validation_scores(network, dataset, weights, biases)
 
-	return weights, biases
+
+		print(f"Epoch {i}, sum_error: {sum_error / len(dataset.X)}, accuracy: {total_correct / len(dataset.X)}")
+
+		log_loss_store_train.append(sum_error / len(dataset.X))
+		accuracy_store_train.append(total_correct / len(dataset.X))
+		log_loss_store_validate.append(validation_log_loss)
+		accuracy_store_validate.append(validation_accuracy)
+
+	return weights, biases, log_loss_store_train, accuracy_store_train, log_loss_store_validate, accuracy_store_validate,
+								
 
 
 @validate_call
@@ -211,7 +250,7 @@ def validate(network: Network, weights: List[List[List[float]]], biases: List[fl
 
 
 @validate_call(config=model_config)
-def run(input, output, iterations: int, learning_rate: float):
+def run(input, output, config_fd, iterations: int, learning_rate: float):
 	df = pd.read_csv(input, names=["id", "diagnosis"] + [f"c_{i}" for i in range(0, 30)] )
 
 	labels = df['diagnosis'].copy()
@@ -220,28 +259,16 @@ def run(input, output, iterations: int, learning_rate: float):
 
 	mean, std = df.iloc[:,2:].mean().to_numpy(), df.iloc[:,2:].std().to_numpy()
 
-	print(mean, std)
-
 	dataset = Dataset.make(df, 20)
 
-	# print(len(dataset.X), len(dataset.Y))
-	# print(len(dataset.XValidate), len(dataset.YValidate))
+	network = eval(config_fd.read())
 
-	network = Network(layers = [
-		# in
-		Layer(size=30, activation='sigmoid'),
-		# hidden
-		Layer(size=20, activation='sigmoid'),
-		Layer(size=20, activation='sigmoid'),
-		# out
-		Layer(size=2, activation='softmax'),
-	])
-
-	print(network)
-
-	weights, biases = train(network, dataset, iterations, learning_rate)
+	weights, biases, loss_train, accuracy_train, loss_validate, accuracy_validate = train(network, dataset, iterations, learning_rate)
 
 	validate(network, weights, biases, dataset)
+
+	plot_accuracy(accuracy_train, accuracy_validate)
+	plot_log_loss(loss_train, loss_validate)
 
 	save_weights(output, weights, biases, mean, std, network)
 

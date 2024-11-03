@@ -1,4 +1,5 @@
 
+from typing import List
 from matplotlib import pyplot as plt
 from matplotlib.ticker import PercentFormatter
 import numpy as np
@@ -6,6 +7,24 @@ import pandas as pd
 from pydantic import ConfigDict, validate_call
 
 model_config = ConfigDict(arbitrary_types_allowed=True)
+
+@validate_call
+def plot_log_loss(train: List[float], validate: List[float]):
+	plt.plot(train, 'blue')
+	plt.plot(validate, 'orange')
+	plt.title('log loss')
+
+	plt.savefig('output/training/log_loss.png')
+	plt.clf()
+
+@validate_call
+def plot_accuracy(train: List[float], validate: List[float]):
+	plt.plot(train, 'blue')
+	plt.plot(validate, 'orange')
+	plt.title('Accuracy')
+
+	plt.savefig('output/training/accuracy.png')
+	plt.clf()
 
 @validate_call(config=model_config)
 def plot_dataset(path: str, b: pd.Series, m: pd.Series):

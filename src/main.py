@@ -28,6 +28,7 @@ if __name__ == "__main__":
 	train_parser.add_argument('-i', '--iterations', default='200', type=int)
 	train_parser.add_argument('--learning-rate', default='0.5', type=float)
 	train_parser.add_argument('-o', '--output', type=argparse.FileType('w'), default='output/weights.json')
+	train_parser.add_argument('-c', '--config', type=argparse.FileType('r'), default='./config.py')
 
 
 	split = subparser.add_parser('split')
@@ -55,7 +56,7 @@ if __name__ == "__main__":
 		case "split":
 			split_dataset(args.input, args.validation_pct, args.train_path, args.validate_path)
 		case "train":
-			train.run(args.input, args.output, args.iterations, args.learning_rate)
+			train.run(args.input, args.output, args.config, args.iterations, args.learning_rate)
 		case "train_test":
 			sklearn_example.run(df)
 		case _:
