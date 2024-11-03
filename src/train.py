@@ -154,7 +154,7 @@ def	get_validation_scores(network: Network, dataset: Dataset, weights: List[List
 		for x, (exp, output) in enumerate(zip(expected, outputs[-1])):
 			log_loss_score += -exp * math.log(output + 1e-15) - (1 - exp) * math.log(1 - output + 1e-15)
 
-	return (log_loss_score / len(dataset.XValidate)), accuracy_score / len(dataset.XValidate)
+	return log_loss_score / len(dataset.XValidate), accuracy_score / len(dataset.XValidate)
 
 
 
@@ -170,7 +170,7 @@ def train(network: Network, dataset: Dataset, iterations: int, learning_rate: fl
 
 
 	for i in range(iterations):
-		sum_error = 0.0
+		log_loss = 0.0
 		total_correct = 0
 
 		for item_x, item_y in zip(dataset.X, dataset.Y):
@@ -186,11 +186,10 @@ def train(network: Network, dataset: Dataset, iterations: int, learning_rate: fl
 			if (outputs[-1][0] > outputs[-1][1] and item_y == 0) or (outputs[-1][1] > outputs[-1][0] and item_y == 1):
 				total_correct += 1
 
-			# sum_error += sum((exp - output) ** 2 for exp, output in zip(expected, outputs[-1]))
+			# log_loss += sum((exp - output) ** 2 for exp, output in zip(expected, outputs[-1]))
 
 			for x, (exp, output) in enumerate(zip(expected, outputs[-1])):
-				# if (x == item_y and expected[x] > expected[1 - x] ):
-					sum_error += -exp * math.log(output + 1e-15) - (1 - exp) * math.log(1 - output + 1e-15)
+				log_loss += -exp * math.log(output + 1e-15) - (1 - exp) * math.log(1 - output + 1e-15)
 
 
 			deltas, errors = backward_propagate(network, weights, outputs, expected)
@@ -202,9 +201,9 @@ def train(network: Network, dataset: Dataset, iterations: int, learning_rate: fl
 		validation_log_loss, validation_accuracy = get_validation_scores(network, dataset, weights, biases)
 
 
-		print(f"Epoch {i}, sum_error: {sum_error / len(dataset.X)}, accuracy: {total_correct / len(dataset.X)}")
+		print(f"Epoch {i}, Train: [loss: {log_loss / len(dataset.X)}, accuracy: {total_correct / len(dataset.X)}], validate: [loss: {validation_log_loss}, accuracy: {validation_accuracy}]")
 
-		log_loss_store_train.append(sum_error / len(dataset.X))
+		log_loss_store_train.append(log_loss / len(dataset.X))
 		accuracy_store_train.append(total_correct / len(dataset.X))
 		log_loss_store_validate.append(validation_log_loss)
 		accuracy_store_validate.append(validation_accuracy)
@@ -251,7 +250,7 @@ def validate(network: Network, weights: List[List[List[float]]], biases: List[fl
 
 @validate_call(config=model_config)
 def run(input, output, config_fd, iterations: int, learning_rate: float):
-	df = pd.read_csv(input, names=["id", "diagnosis"] + [f"c_{i}" for i in range(0, 30)] )
+	df = pd.read_csv(input)
 
 	labels = df['diagnosis'].copy()
 

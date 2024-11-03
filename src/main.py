@@ -8,6 +8,7 @@ import numpy as np
 
 import describe
 import plot
+import predict
 import sklearn_example
 from split_dataset import split_dataset
 import train
@@ -40,6 +41,14 @@ if __name__ == "__main__":
 
 	subparser.add_parser('train_test')
 
+	predict_parser = subparser.add_parser('predict')
+	predict_parser.add_argument('-c', '--config', type=argparse.FileType('r'), default='./config.py')
+	predict_parser.add_argument('--input', type=argparse.FileType('r'), default='./data/validate.csv')
+	predict_parser.add_argument('-w', '--weights', type=argparse.FileType('r'), default='./output/weights.json')
+
+
+
+
 	args = parser.parse_args()
 
 	# df = pd.read_csv(args.input, names=["id", "diagnosis"] + [f"c_{i}" for i in range(0, 30)] )
@@ -57,6 +66,8 @@ if __name__ == "__main__":
 			split_dataset(args.input, args.validation_pct, args.train_path, args.validate_path)
 		case "train":
 			train.run(args.input, args.output, args.config, args.iterations, args.learning_rate)
+		case "predict":
+			predict.predict(args.weights, args.input, args.config)
 		case "train_test":
 			sklearn_example.run(df)
 		case _:
