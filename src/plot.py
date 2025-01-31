@@ -30,8 +30,8 @@ def plot_accuracy(train: List[float], validate: List[float]):
 def plot_dataset(path: str, b: pd.Series, m: pd.Series):
 	plt.plot()
 
-	plt.hist(b, color='red', bins=50, weights=np.ones(len(b)) / len(b))
-	plt.hist(m, color='blue', bins=50, weights=np.ones(len(m)) / len(m))
+	plt.hist(b, color='red', bins=50, alpha=1, weights=np.ones(len(b)) / len(b))
+	plt.hist(m, color='blue', bins=50, alpha=0.5, weights=np.ones(len(m)) / len(m))
 
 	plt.gca().yaxis.set_major_formatter(PercentFormatter(1))
 

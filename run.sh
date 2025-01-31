@@ -1,5 +1,5 @@
 set -ex
 
-docker build -t ft_dslr . 2> /dev/null
+docker build -t multilayer-perceptron .
 
-docker run --rm -it -v $PWD:/app ft_dslr $@
+docker run --rm -it -v $PWD:/app multilayer-perceptron $@
