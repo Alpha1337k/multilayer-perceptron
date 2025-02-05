@@ -40,7 +40,7 @@ if __name__ == "__main__":
 	train_parser = subparser.add_parser('train')
 	
 	train_parser.add_argument('--input', type=argparse.FileType('r'), default='./data/train.csv')
-	train_parser.add_argument('-i', '--iterations', default='200', type=int)
+	train_parser.add_argument('-i', '--iterations', default='100', type=int)
 	train_parser.add_argument('--learning-rate', default='0.5', type=float)
 	train_parser.add_argument('-o', '--output', type=argparse.FileType('w'), default='output/weights.json')
 	train_parser.add_argument('-c', '--config', type=argparse.FileType('r'), default='./config.py')

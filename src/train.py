@@ -108,7 +108,7 @@ def backward_propagate(network: Network, weights: List[List[List[float]]], outpu
 			output = outputs[layer_idx][neuron_idx]
 
 			deltas[layer_idx][neuron_idx] = error * transfer_derivative(output)
-	
+
 	return deltas, errors
 
 @validate_call

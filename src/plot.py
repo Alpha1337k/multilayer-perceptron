@@ -49,4 +49,5 @@ def plot(df: pd.DataFrame):
 	# print(data_B)
 
 	for col in data_B:
-		plot_dataset(f"output/plot/b_{col}.png", data_B[col], data_M[col])
+		if (col.startswith('c')):
+			plot_dataset(f"output/plot/b_{col}.png", data_B[col], data_M[col])
